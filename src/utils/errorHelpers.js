@@ -1,10 +1,5 @@
-const handleDataModelValidationError = (err) => {
-    err.status = 400; //Bad request
-    err.message = Object.values(err.errors)[0].message;
-}
-
 const handleDataModelDuplicationError = (err) => {
-    err.status = 409; //
+    err.status = 409;
     err.message = `already exists`;
 }
 
@@ -17,7 +12,7 @@ exports.createError = (message, status, page, data) => {
     return {
         message, status, page, data
     };
-}
+};
 
 exports.configError = (error, status, page, data) => {
     const options = {
