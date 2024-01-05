@@ -10,7 +10,7 @@ const registerValidatorSchema = checkSchema({
     email: {
         isLength: {
             options: { min: 10 },
-            errorMessage: 'Username should be at least ten chars long'
+            errorMessage: 'Email should be at least ten chars long'
         },
         isEmail: {
             bail: true,

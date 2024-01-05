@@ -1,6 +1,6 @@
 const hbs = require('express-handlebars');
 
-exports.configViewEngine = app => {
+exports.provideViewEngine = app => {
     app.engine('hbs', hbs.engine({
         extname: 'hbs'
     }));
