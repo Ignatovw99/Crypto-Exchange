@@ -1,15 +1,25 @@
 const jwt = require('jsonwebtoken');
 
-const { COOKIE_SESSION_NAME } = require('../constants');
-const { SECRET } = require('../config/env');
+const { secret } = require('../config/auth');
+const { cookieSessionName } = require('../config/web');
 
-exports.auth = (req, res, next) => {
-    const authToken = req.cookies[COOKIE_SESSION_NAME];
+exports.attachAuthCookieFunctions = (req, res, next) => {
+    const authorizationTokenCookie = (token) => res.cookie(cookieSessionName, token, { httpOnly: true });
+    const clearAuthorizationCookie = () => res.clearCookie(cookieSessionName);
+
+    res.authorizationTokenCookie = authorizationTokenCookie;
+    res.clearAuthorizationCookie = clearAuthorizationCookie;
+
+    next();
+};
+
+exports.authenticate = (req, res, next) => {
+    const authToken = req.cookies[cookieSessionName];
 
     if (authToken) {
-        jwt.verify(authToken, SECRET, (err, user) => {
+        jwt.verify(authToken, secret, (err, user) => {
             if (err) {
-                res.clearCookie(COOKIE_SESSION_NAME);
+                res.clearCookie(cookieSessionName);
                 return res.redirect('/auth/login');
             }
             req.user = user;
