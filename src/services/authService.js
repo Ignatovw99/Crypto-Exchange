@@ -1,37 +1,72 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-const User = require('../models/User');
-const { SECRET } = require('../config/env');
+const userRepositry = require('../repositories/userRepository');
 
-exports.create = (userData) => User.create(userData);
+const {
+    UnauthorizedError,
+    AlreadyExistError,
+    InvalidStateError
+} = require('../errors');
+const {
+    INVALID_CREDENTIALS,
+    USER_ALREADY_EXISTS,
+    PASSWORD_MISMATCH
+} = require('../errors/errorConstants');
 
-exports.login = async (email, password) => {
-    const user = await User.findOne({ email });
-    if (!user) {
-        throw 'Invalid username or password';
+const { secret } = require('../config/auth');
+
+const register = async (user) => {
+    const { email, password, repeatPassword } = user;
+
+    const existingUser = await userRepositry.findByEmail(email);
+    if (existingUser) {
+        AlreadyExistError.throwError(USER_ALREADY_EXISTS, { email });
     }
 
-    const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) {
-        throw 'Invalid username or password';
+    if (!password || password !== repeatPassword) {
+        throw new InvalidStateError(PASSWORD_MISMATCH);
+    }
+
+    return userRepositry.create(user);
+};
+
+const login = async (email, password) => {
+    const user = await userRepositry.findByEmail(email);
+    if (!user) {
+        throw new UnauthorizedError(INVALID_CREDENTIALS);
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+        throw new UnauthorizedError(INVALID_CREDENTIALS);
     }
 
     return user;
 };
 
-exports.generateAuthToken = (user) => {  
-    const payload = { _id: user._id, username: user.username, email: user.email };
+const generateAuthorizationToken = async (user) => {
+    const payload = {
+        _id: user._id,
+        username: user.username,
+        email: user.email
+    };
     const options = { expiresIn: '2d' };
 
-    const tokenPromise = new Promise((resolve, reject) => {
-        jwt.sign(payload, SECRET, options, (err, token) => {
+    const tokenSigningPromise = new Promise((resolve, reject) => {
+        jwt.sign(payload, secret, options, (err, token) => {
             if (err) {
                 return reject(err);
             }
             resolve(token);
         });
     });
-    
-    return tokenPromise;
+
+    return tokenSigningPromise;
+};
+
+module.exports = {
+    login,
+    register,
+    generateAuthorizationToken
 };
