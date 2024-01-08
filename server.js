@@ -1,9 +1,9 @@
 const http = require('node:http');
 
-const { connectDatabase } = require('./src/providers/database');
-const { port } = require('./src/config/server');
-
 const app = require("./src/app");
+const { connectDatabase } = require('./src/config/database');
+
+const { port } = require('./src/config/properties').server;
 
 const server = http.createServer(app);
 

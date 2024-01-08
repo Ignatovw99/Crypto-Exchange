@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
-const { secret } = require('../config/auth');
-const { cookieSessionName } = require('../config/web');
+const { secret } = require('../config/properties').auth;
+const { cookieSessionName } = require('../config/properties').web;
 
 exports.attachAuthCookieFunctions = (req, res, next) => {
     const authorizationTokenCookie = (token) => res.cookie(cookieSessionName, token, { httpOnly: true });

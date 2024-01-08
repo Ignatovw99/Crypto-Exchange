@@ -14,7 +14,7 @@ const {
     PASSWORD_MISMATCH
 } = require('../errors/errorConstants');
 
-const { secret } = require('../config/auth');
+const { secret } = require('../config/properties').auth;
 
 const register = async (user) => {
     const { email, password, repeatPassword } = user;

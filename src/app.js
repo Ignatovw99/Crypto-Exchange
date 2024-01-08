@@ -2,7 +2,7 @@ const express = require('express');
 require('express-async-errors');
 const cookieParser = require('cookie-parser');
 
-const { provideViewEngine } = require('./providers/viewEngine');
+const { configureViewEngine } = require('./config/viewEngine');
 
 const appRoutes = require('./routes');
 
@@ -11,7 +11,7 @@ const { errorHandler } = require('./middlewares/errorHandlerMiddleware');
 
 const app = express();
 
-provideViewEngine(app);
+configureViewEngine(app);
 
 app.use(express.urlencoded({ extended: false }));
 app.use('/static', express.static('public'));
