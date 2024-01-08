@@ -1,20 +1,22 @@
 const cryptoService = require('../services/cryptoService');
-const { createError } = require('../utils/errorHelpers');
+const { ForbiddenError } = require('../errors');
+const {
+    NOT_AUTHORIZED,
+    CRYPTO_OWNER_CANNOT_BUY,
+    CRYPTO_ALREADY_BOUGHT_BY_USER
+} = require('../errors/errorConstants');
 
 exports.preloadCrypto = async (req, res, next) => {
-    try {
-        const crypto = await cryptoService.getOne(req.params.cryptoId);
-        req.crypto = crypto;
-        return next();
-    } catch(error) {
-        return next(createError());
-    }
+    const crypto = await cryptoService.getOne(req.params.cryptoId);
+    req.crypto = crypto;
+    return next();
 };
 
 exports.isOwnerOfCrypto = (req, res, next) => {
     const isOwner = cryptoService.isOwnerOfCrypto(req.crypto.owner, req.user);
     if (!isOwner) {
-        return next(createError('You are not authorized!'), 401);
+        const error = new ForbiddenError(NOT_AUTHORIZED);
+        return next(error);
     }
     next();
 };
@@ -22,11 +24,16 @@ exports.isOwnerOfCrypto = (req, res, next) => {
 exports.canBuyCrypto = (req, res, next) => {
     const isOwner = cryptoService.isOwnerOfCrypto(req.crypto.owner, req.user);
     if (isOwner) {
-        return next(createError('You are the owner of these crypto coins. You cannot buy.'), 400);
+        return next(new ForbiddenError(CRYPTO_OWNER_CANNOT_BUY));
     }
+
     const isBoughtByUser = cryptoService.isBoughtByUser(req.crypto.buyers, req.user);
     if (isBoughtByUser) {
-        return next(createError('You already bought these crypto coins.'), 400);
+        const errorData = {
+            name: req.crypto.name,
+            username: req.user.username
+        }
+        return next(ForbiddenError.createError(CRYPTO_ALREADY_BOUGHT_BY_USER, errorData));
     }
     next();
 }
