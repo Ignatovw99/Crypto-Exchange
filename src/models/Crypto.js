@@ -1,9 +1,11 @@
 const mongoose = require('mongoose');
+const mongooseLeanVirtuals = require('mongoose-lean-virtuals');
 
 const cryptoSchema = new mongoose.Schema({
     name: {
         type: String,
-        required: true
+        required: true,
+        unique: true
     },
     image: {
         type: String,
@@ -24,13 +26,22 @@ const cryptoSchema = new mongoose.Schema({
     },
     owner: {
         type: mongoose.Types.ObjectId,
-        ref: 'User'
+        ref: 'User',
+        required: true
     },
     buyers: [{
         type: mongoose.Types.ObjectId,
         ref: 'User'
     }]
 });
+
+cryptoSchema.plugin(mongooseLeanVirtuals);
+
+cryptoSchema.statics.getStringFields = function () {
+    return Object.entries(this.schema.paths)
+        .filter(([fieldName, field]) => field.instance === 'String')
+        .map(([fieldName]) => fieldName);
+};
 
 const Crypto = mongoose.model('Crypto', cryptoSchema);
 
