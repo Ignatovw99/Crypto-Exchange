@@ -1,94 +1,72 @@
-const router = require('express').Router();
 const { validationResult } = require('express-validator');
 
 const cryptoService = require('../services/cryptoService');
-const { isAuthenticated } = require('../middlewares/authMiddleware');
-const { preloadCrypto, canBuyCrypto, isOwnerOfCrypto } = require('../middlewares/cryptoMiddleware');
-const { createError, configError } = require('../utils/errorHelpers');
-const { cryptoValidator } = require('../validators/cryptoValidator');
+const { StateValidationError } = require('../errors');
 
-
-router.get('/', async (req, res) => {
+const getAll = async (req, res) => {
     const cryptos = await cryptoService.getAll();
     res.render('crypto/catalog', { cryptos });
-});
+};
 
-router.get('/search', async (req, res) => {
+const searchCryptos = async (req, res) => {
     const cryptos = await cryptoService.getAll(req.query);
     res.render('crypto/search', { cryptos, ...req.query });
-});
+};
 
-router.get('/:cryptoId/details', async (req, res, next) => {
-    try {
-        const crypto = await cryptoService.getOne(req.params.cryptoId);
-        const isOwner = cryptoService.isOwnerOfCrypto(crypto.owner, req.user);
-        const isBoughtByUser = cryptoService.isBoughtByUser(crypto.buyers, req.user);
-        res.render('crypto/details', { ...crypto, isOwner, isBoughtByUser });
-    } catch (error) {
-        next(createError());
-    }
-});
+const getCryptoDetails = async (req, res) => {
+    const crypto = await cryptoService.getOne(req.params.cryptoId);
+    const isOwner = cryptoService.isOwnerOfCrypto(crypto.owner, req.user);
+    const isBoughtByUser = cryptoService.isBoughtByUser(crypto.buyers, req.user);
 
-router.get('/create', isAuthenticated, (req, res) => {
+    res.render('crypto/details', { ...crypto, isOwner, isBoughtByUser });
+};
+
+const createCryptoPage = (req, res) => {
     res.render('crypto/create');
-});
+};
 
-router.post('/create', isAuthenticated, cryptoValidator, async (req, res, next) => {
+const createCrypto = async (req, res) => {
     const errors = validationResult(req);
-
     if (!errors.isEmpty()) {
-        configError(errors, 400, 'crypto/create', req.body);
-        return next(errors);
+        throw new StateValidationError(errors.errors);
     }
 
-    const cryptoData = { ...req.body, owner: req.user._id };
-    try {
-        await cryptoService.create(cryptoData);
-        res.redirect('/cryptos');
-    } catch (error) {
-        configError(error, 400, 'crypto/create', req.body);
-        return next(error);
-    }
-});
+    await cryptoService.create(req.body, req.user._id);
+    res.redirect('/cryptos');
+};
 
-router.get('/:cryptoId/update', isAuthenticated, preloadCrypto, isOwnerOfCrypto, async (req, res) => {
+const updateCryptoPage = (req, res) => {
     res.render('crypto/edit', { ...req.crypto });
-});
+};
 
-router.post('/:cryptoId/update', isAuthenticated, cryptoValidator, preloadCrypto, isOwnerOfCrypto,  async (req, res, next) => {
+const updateCrypto = async (req, res) => {
     const errors = validationResult(req);
-
     if (!errors.isEmpty()) {
-        configError(errors, 400, 'crypto/create', req.body);
-        return next(errors);
+        throw new StateValidationError(errors.errors);
     }
 
-    try {
-        await cryptoService.update(req.params.cryptoId, req.body);
-        res.redirect(`/cryptos/${req.params.cryptoId}/details`);
-    } catch (error) {
-        configError(error, 400, 'publication/edit', req.body);
-        return next(error);
-    }
-});
+    await cryptoService.update(req.params.cryptoId, req.body);
+    res.redirect(`/cryptos/${req.params.cryptoId}/details`);
+};
 
-router.get('/:cryptoId/delete', isAuthenticated, preloadCrypto, isOwnerOfCrypto, async (req, res) => {
-    try {
-        await cryptoService.delete(req.params.cryptoId);
-        res.redirect('/cryptos');
-    } catch (error) {
-        next(createError());
-    }
-});
+const deleteCtypto = async (req, res) => {
+    await cryptoService.deleteCrypto(req.params.cryptoId);
+    res.redirect('/cryptos');
+};
 
-router.get('/:cryptoId/buy', isAuthenticated, preloadCrypto, canBuyCrypto, async (req, res, next) => {
+const buyCrypto = async (req, res) => {
+    await cryptoService.buyCryptoByUser(req.params.cryptoId, req.user);
+    res.redirect(`/cryptos/${req.params.cryptoId}/details`);
+};
 
-    try {
-        await cryptoService.buyCryptoByUser(req.params.cryptoId, req.user);
-        res.redirect(`/cryptos/${req.params.cryptoId}/details`);
-    } catch (error) {
-        return next(createError(error, 401));
-    }
-});
-
-module.exports = router;
+module.exports = {
+    getAll,
+    searchCryptos,
+    getCryptoDetails,
+    createCryptoPage,
+    createCrypto,
+    updateCryptoPage,
+    updateCrypto,
+    deleteCtypto,
+    buyCrypto
+};
