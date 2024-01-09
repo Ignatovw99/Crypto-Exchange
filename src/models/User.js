@@ -19,7 +19,12 @@ const userSchema = new mongoose.Schema({
     }
 });
 
-userSchema.pre('save', function(next) {
+userSchema.pre('save', function (next) {
+    if (!this.isModified('password')) {
+        next();
+        return;
+    }
+    
     bcrypt.hash(this.password, saltRounds)
         .then((hashedPassword) => {
             this.password = hashedPassword;
