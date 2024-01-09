@@ -1,35 +1,82 @@
-const Crypto = require('../models/Crypto');
+const cryptoRepository = require('../repositories/cryptoRepository');
+const userRepository = require('../repositories/userRepository');
 
-exports.create = (cryptoData) => Crypto.create(cryptoData);
+const { InvalidStateError, NotFoundError, AlreadyExistError } = require('../errors');
+const {
+    CRYPTO_WITH_NAME_ALREDY_EXISTS,
+    USER_NOT_FOUND,
+    CRYPTO_NOT_FOUND,
+    CRYPTO_ALREADY_BOUGHT_BY_USER
+} = require('../errors/errorConstants');
 
-exports.update = (cryptoId, cryptoData) => Crypto.updateOne({ _id: cryptoId }, { ...cryptoData }, { runValidators: true });
-
-exports.delete = (cryptoId) => Crypto.deleteOne({ _id: cryptoId });
-
-const getQueryResult = (query) => {
-    const queryResult = {};
-    if (query.name && query.name != '') {
-        queryResult.name = { $regex: new RegExp(query.name, 'i') };
+const create = async (cryptoData, userId) => {
+    const crypto = await cryptoRepository.findByName(cryptoData.name);
+    if (crypto) {
+        AlreadyExistError.throwError(CRYPTO_WITH_NAME_ALREDY_EXISTS, { name: cryptoData.name });
     }
-    if (query.paymentMethod) {
-        queryResult.paymentMethod = { $regex: new RegExp(query.paymentMethod, 'i') };
+
+    const user = await userRepository.findById(userId);
+    if (!user) {
+        throw new InvalidStateError(USER_NOT_FOUND);
     }
-    return queryResult;
-}
 
-exports.getAll = (query = {}) => {
-    const queryResult = getQueryResult(query);
-    return Crypto.find(queryResult).lean();
-}
+    return cryptoRepository.create({ ...cryptoData, owner: user._id });
+};
 
-exports.getOne = (cryptoId) => Crypto.findById(cryptoId).lean();
+const update = async (cryptoId, cryptoData) => {
+    const existingCrypto = await cryptoRepository.existsAnotherCryptoWithName(cryptoId, cryptoData.name);
+    if (existingCrypto) {
+        AlreadyExistError.throwError(CRYPTO_WITH_NAME_ALREDY_EXISTS, { name: cryptoData.name });
+    }
 
-exports.isOwnerOfCrypto = (cryptoOwner, user) => user ? cryptoOwner == user._id : false;
+    const updatedCrypto = await cryptoRepository.updateById(cryptoId, cryptoData);
+    if (!updatedCrypto) {
+        throw new NotFoundError(CRYPTO_NOT_FOUND);
+    }
+    
+    return updatedCrypto;
+};
 
-exports.isBoughtByUser = (cryptoBuyers, user) => user ? cryptoBuyers.map(buyerId => buyerId.toString()).includes(user._id) : false;
+const deleteCrypto = async (cryptoId) => {
+    const deletedCrypto = await cryptoRepository.deleteById(cryptoId);
+    if (!deletedCrypto) {
+        throw new NotFoundError(CRYPTO_NOT_FOUND);
+    }
+};
 
-exports.buyCryptoByUser = async (cryptoId, user) => {
-    const crypto = await Crypto.findById(cryptoId);
-    crypto.buyers.push(user._id);
-    return crypto.save();
-}
+const getAll = async (query = {}) => cryptoRepository.findAllBySearchCriteria(query);
+
+const getOne = async (cryptoId) => {
+    const crypto = await cryptoRepository.findById(cryptoId);
+    if (!crypto) {
+        throw new NotFoundError(CRYPTO_NOT_FOUND);
+    }
+    return crypto;
+};
+
+const isOwnerOfCrypto = (cryptoOwner, user) => user && cryptoOwner == user._id;
+
+const isBoughtByUser = (cryptoBuyers, user) => user && cryptoBuyers.map(buyerId => buyerId.toString()).includes(user._id);
+
+const buyCryptoByUser = async (cryptoId, user) => {
+    const crypto = await getOne(cryptoId);
+    if (isBoughtByUser(crypto.buyers, user)) {
+        InvalidStateError.throwError(
+            CRYPTO_ALREADY_BOUGHT_BY_USER,
+            { name: crypto.name, username: user.username }
+        );
+    }
+
+    return cryptoRepository.addBuyerToCrypto(cryptoId, user._id);
+};
+
+module.exports = {
+    create,
+    update,
+    deleteCrypto,
+    getAll,
+    getOne,
+    isOwnerOfCrypto,
+    isBoughtByUser,
+    buyCryptoByUser
+};
